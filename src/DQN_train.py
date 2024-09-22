@@ -5,12 +5,12 @@ from collections import deque
 from tensorflow.keras import models, layers, optimizers
 import matplotlib.pyplot as plt
 
-# list for visualization
+# Lists for visualization
 viz = True
 scores = []
 epsilons = []
 
-# environment setting
+# Environment setting
 if viz:
     env = gym.make("CartPole-v1", render_mode="human")
 else:
@@ -40,29 +40,29 @@ def build_model():
 class DQNAgent:
     def __init__(self):
         self.model = build_model()
-        self.target_model = build_model()  # 타깃 네트워크
-        self.update_target_model()  # 타깃 네트워크 가중치 동기화
+        self.target_model = build_model()  # Target network
+        self.update_target_model()  # Synchronize target network weights
 
     def update_target_model(self):
-        # 메인 네트워크의 가중치를 타깃 네트워크로 복사
+        # Copy weights from the main network to the target network
         self.target_model.set_weights(self.model.get_weights())
 
     def remember(self, state, action, reward, next_state, done):
-        # 경험 메모리 저장
+        # Store experience in memory
         memory.append((state, action, reward, next_state, done))
 
     def act(self, state):
-        # 상태를 예측하기 전에 2차원 배열로 변환
+        # Reshape the state into a 2D array before prediction
         state = np.reshape(state, [1, state_size])
         
         if np.random.rand() <= epsilon:
             return random.randrange(action_size)
         
-        q_values = self.model.predict(state)  # 2차원으로 변환된 상태 사용
+        q_values = self.model.predict(state)  # Use the reshaped state
         return np.argmax(q_values[0])
 
     def save(self, name):
-        # 모델 저장
+        # Save the model
         self.model.save(name)
 
     def replay(self):
@@ -73,93 +73,90 @@ class DQNAgent:
         for state, action, reward, next_state, done in minibatch:
             target = reward
             if not done:
-                # next_state를 2차원 배열로 변환
+                # Reshape next_state into a 2D array
                 next_state = np.reshape(next_state, [1, state_size])
                 target = reward + gamma * np.amax(self.target_model.predict(next_state)[0])
             
-            # state도 2차원 배열로 변환
+            # Reshape state into a 2D array
             state = np.reshape(state, [1, state_size])
             target_f = self.model.predict(state)
             target_f[0][action] = target
 
-            # 모델 학습
+            # Train the model
             self.model.fit(state, target_f, epochs=1, verbose=0)
 
         global epsilon
         if epsilon > epsilon_min:
             epsilon *= epsilon_decay
 
-
-
-# train
+# Train the agent
 agent = DQNAgent()
 episodes = 1000
-target_update_freq = 10  # 타깃 네트워크 갱신 주기
+target_update_freq = 10  # Target network update frequency
 
 for e in range(episodes):
     state = env.reset()
     if isinstance(state, tuple):
-        state = state[0]  # 상태 값만 추출 (튜플의 첫 번째 요소)
-    # 상태가 1차원 배열일 경우에만 (1, state_size)로 변환
+        state = state[0]  # Extract only the state value (first element of the tuple)
+    # Only reshape if state is a tuple (for Gym versions >=0.26)
     if isinstance(state, tuple):
         state = np.reshape(state, [1, state_size])
     total_reward = 0
 
     for time in range(500):
-        # 환경 시각화
+        # Render the environment
         if viz:
             env.render()
 
-        # 에이전트가 행동을 선택
+        # Agent selects an action
         action = agent.act(state)
 
-        # 환경에서 선택한 행동을 실행
-        # 행동 실행 및 반환 값 확인
+        # Execute the selected action in the environment
+        # Handle different return value lengths (terminated and truncated)
         result = env.step(action)
 
-        # 반환된 값의 길이에 따라 언패킹
+        # Unpack the returned values based on their length
         if len(result) == 4:
             next_state, reward, done, info = result
         else:
-            # 반환값의 개수가 다를 경우 추가 처리
-            next_state = result[0]  # 상태
-            reward = result[1]      # 보상
-            done = result[2]        # 종료 여부
-            info = result[3] if len(result) > 3 else {}  # 추가 정보 (있는 경우만)
+            # Additional processing if the number of returned values differs
+            next_state = result[0]  # Next state
+            reward = result[1]      # Reward
+            done = result[2]        # Done flag
+            info = result[3] if len(result) > 3 else {}  # Additional info (if available)
 
-
-        # 보상 업데이트
+        # Update reward
         reward = reward if not done else -10
         total_reward += reward
 
-        # 경험 저장
+        # Store experience
         agent.remember(state, action, reward, next_state, done)
 
-        # 상태 전이
+        # Transition to the next state
         state = next_state
 
-        # 게임이 끝났을 때
+        # If the episode is done
         if done:
             print(f"Episode: {e}/{episodes}, Score: {time}, Epsilon: {epsilon:.2}")
-            scores.append(time)  # 점수 기록
-            epsilons.append(epsilon)  # epsilon 기록
+            scores.append(time)      # Record score
+            epsilons.append(epsilon) # Record epsilon
             break
 
-    # Replay를 통해 학습
+    # Replay to train the model
     agent.replay()
 
-    # 타깃 네트워크 주기적 업데이트
+    # Periodically update the target network
     if e % target_update_freq == 0:
         agent.update_target_model()
 
-    # 일정 에피소드마다 모델 저장
+    # Save the model at regular intervals
     if e % 50 == 0:
         agent.save(f"./RL/model/cartpole-dqn-{e}.h5")
 
-# 최종 모델 저장
+# Save the final model
 agent.save("./RL/model/cartpole-dqn-final.h5")
 
-# 학습 결과 시각화
+# Visualize training results
 plt.figure(figsize=(12, 5))
 plt.subplot(1, 2, 1)
 plt.plot(scores)
