@@ -122,7 +122,8 @@ def main():
         state, _ = env.reset()
         ep_reward = 0
         for t in range(max_timesteps):
-            env.render()
+            if viz:
+                env.render()
             action, log_prob = agent.select_action(state)
             next_state, reward, terminated, truncated, _ = env.step(action)
             done = terminated or truncated
