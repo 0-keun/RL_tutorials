@@ -15,7 +15,7 @@ git clone https://github.com/0-keun/RL_tutorials.git
 creating an environment with commands
 
 ```bash
-conda create -n env_RL python=3.8
+conda create -n env_RL python=3.11
 conda activate env_RL
 ```
 
